@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:3DGS}",
+            "name": "Debug GaussianSplatViewer",
+            "target": "GaussianSplatViewer",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug GaussianSplatViewer"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:3DGS}",
+            "name": "Release GaussianSplatViewer",
+            "target": "GaussianSplatViewer",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release GaussianSplatViewer"
+        }
+    ]
+}
