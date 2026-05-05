@@ -30,6 +30,8 @@ class Renderer: NSObject, MTKViewDelegate {
     private var sceneScale: Float  = 1.0
     private var sceneTrans: float3 = .zero
     private var lastMouse:  float2 = .zero
+    private var lastSortFrame: UInt64 = 0
+    private let sortInterval: UInt64 = 2   // sort every 2 frames — good balance of quality vs CPU cost
 
     private var modelMatrix: float4x4 {
         float4x4.translation(sceneTrans)
@@ -155,6 +157,27 @@ class Renderer: NSObject, MTKViewDelegate {
         uni.modelMatrix = modelMatrix
         let off = Int(frameCount % 3) * MemoryLayout<CameraUniforms>.stride
         memcpy(camBuf.contents().advanced(by: off), &uni, MemoryLayout<CameraUniforms>.stride)
+
+        // Sort splats back-to-front every frame for correct alpha blending.
+        // Splat positions are stored in model-local space, so we must bring the
+        // camera into that same space via the inverse model matrix.
+        if frameCount - lastSortFrame >= sortInterval {
+            let mm = modelMatrix
+            let invModel = mm.inverse
+
+            // Camera position in model-local space
+            let camPosLocal = (invModel * float4(camera.position.x,
+                                                 camera.position.y,
+                                                 camera.position.z, 1)).xyz
+
+            // Camera forward in model-local space (no translation needed for direction)
+            let vm = camera.viewMatrix
+            let fwdWorld = normalize(-float3(vm.columns.2.x, vm.columns.2.y, vm.columns.2.z))
+            let fwdLocal = normalize((invModel * float4(fwdWorld.x, fwdWorld.y, fwdWorld.z, 0)).xyz)
+
+            scene.sortSplats(cameraPosition: camPosLocal, forward: fwdLocal)
+            lastSortFrame = frameCount
+        }
 
         let count = UInt32(scene.splatCount)
 

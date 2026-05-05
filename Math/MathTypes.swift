@@ -77,13 +77,15 @@ struct CameraUniforms {
 
 // MARK: - Per-splat vertex  (matches SplatVertex in Metal exactly)
 struct SplatVertex {
-    var screenPos: float2
-    var conic_xy:  float2
-    var conic_z:   Float
-    var opacity:   Float
-    var radius:    Float
-    var _pad:      Float = 0
-    var color:     float4
+    var screenPos:  float2
+    var conic_xy:   float2
+    var conic_z:    Float
+    var opacity:    Float
+    var radius:     Float
+    var _pad:       Float = 0
+    var color:      float4
+    var majorAxis:  float2   // oriented half-major axis (pixels)
+    var minorAxis:  float2   // oriented half-minor axis (pixels)
 }
 
 // MARK: - Settings (CPU-side only)
