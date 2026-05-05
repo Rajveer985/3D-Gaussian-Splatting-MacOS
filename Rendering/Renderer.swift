@@ -3,358 +3,218 @@ import Metal
 import MetalKit
 import simd
 
-enum TransformMode {
-    case none, rotate, scale, translate
-}
-
-enum RendererError: Error {
-    case sceneNotInitialized
-    case pipelineCreationFailed
-}
+enum TransformMode { case none, rotate, scale, translate }
+enum RendererError: Error { case sceneNotInitialized }
 
 class Renderer: NSObject, MTKViewDelegate {
-    let device: MTLDevice
+
+    let device:       MTLDevice
     let commandQueue: MTLCommandQueue
-    let library: MTLLibrary
+    let library:      MTLLibrary
 
-    // Compute pipeline states
     var projectPSO: MTLComputePipelineState?
-    var binningPSO: MTLComputePipelineState?
-    var sortPSO:    MTLComputePipelineState?
-    var renderPSO:  MTLComputePipelineState?
+    var renderPSO:  MTLRenderPipelineState?
 
-    // Buffers
-    var cameraUniformsBuffer: MTLBuffer?
-    let cameraUniformStride = ((MemoryLayout<CameraUniforms>.stride + 255) / 256) * 256
-    var splatSettingsBuffer: MTLBuffer?
-    var tileCountsBuffer: MTLBuffer?
-    var tileListBuffer: MTLBuffer?
+    var splatVertexBuffer:  MTLBuffer?
+    var cameraBuffer:       MTLBuffer?
+    var quadIndexBuffer:    MTLBuffer?
 
-    // Scene & camera
-    var scene: Scene?
-    var camera: Camera
+    var scene:        Scene?
+    var camera:       Camera
     var viewportSize: float2 = float2(800, 600)
-    var frameCount: UInt64 = 0
-
-    // Tile config
-    let tileSize = 16
-    let maxGaussiansPerTile = 1024
-
-    // Scene transform
-    var activeTransformMode: TransformMode = .none
-    private var sceneRotation: float3    = .zero
-    private var sceneScale: Float        = 1.0
-    private var sceneTranslation: float3 = .zero
-    private var lastTransformMousePos: float2 = .zero
-
-    // User-facing splat settings (written to GPU every frame)
+    var frameCount:   UInt64 = 0
     var splatSettings = SplatSettings()
 
-    // MARK: - Model Matrix
+    var activeTransformMode: TransformMode = .none
+    private var sceneRot:   float3 = .zero
+    private var sceneScale: Float  = 1.0
+    private var sceneTrans: float3 = .zero
+    private var lastMouse:  float2 = .zero
 
     private var modelMatrix: float4x4 {
-        let T  = float4x4.translation(sceneTranslation)
-        let Rx = float4x4.rotationX(sceneRotation.x)
-        let Ry = float4x4.rotationY(sceneRotation.y)
-        let Rz = float4x4.rotationZ(sceneRotation.z)
-        let S  = float4x4.scale(float3(repeating: sceneScale))
-        return T * Rz * Ry * Rx * S
+        float4x4.translation(sceneTrans)
+            * float4x4.rotationZ(sceneRot.z)
+            * float4x4.rotationY(sceneRot.y)
+            * float4x4.rotationX(sceneRot.x)
+            * float4x4.scale(float3(repeating: sceneScale))
     }
 
-    // MARK: - Init
-
     init?(metalKitView: MTKView) {
-        guard
-            let device       = MTLCreateSystemDefaultDevice(),
-            let commandQueue = device.makeCommandQueue()
-        else { return nil }
+        guard let dev = MTLCreateSystemDefaultDevice(),
+              let cq  = dev.makeCommandQueue() else { return nil }
+        device = dev; commandQueue = cq
 
-        self.device       = device
-        self.commandQueue = commandQueue
-
-        do {
-            self.library = try device.makeDefaultLibrary(bundle: .main)
-        } catch {
-            print("Failed to load Metal library: \(error)")
-            return nil
+        guard let lib = try? dev.makeDefaultLibrary(bundle: .main) else {
+            print("ERROR: could not load Metal library"); return nil
         }
+        library = lib
 
         let aspect = Float(metalKitView.drawableSize.width) /
                      max(1, Float(metalKitView.drawableSize.height))
-        self.camera = Camera(
-            position: float3(0, 0, 5),
-            target: .zero,
-            aspectRatio: aspect
-        )
-
+        camera = Camera(position: float3(0,0,5), target: .zero, aspectRatio: aspect)
         super.init()
 
-        metalKitView.device       = device
-        metalKitView.delegate     = self
-        metalKitView.colorPixelFormat  = .bgra8Unorm_srgb
-        metalKitView.framebufferOnly   = false   // required for compute write to drawable
+        metalKitView.device                  = dev
+        metalKitView.delegate                = self
+        metalKitView.colorPixelFormat        = .bgra8Unorm_srgb
+        metalKitView.depthStencilPixelFormat = .depth32Float
+        metalKitView.framebufferOnly         = false
         metalKitView.preferredFramesPerSecond = 60
 
-        createPipelines()
+        buildPipelines()
 
-        cameraUniformsBuffer = device.makeBuffer(
-            length: cameraUniformStride * 3,
-            options: .storageModeShared
-        )
-        splatSettingsBuffer = device.makeBuffer(
-            length: MemoryLayout<SplatSettings>.stride,
-            options: .storageModeShared
-        )
+        cameraBuffer = dev.makeBuffer(
+            length: MemoryLayout<CameraUniforms>.stride * 3,
+            options: .storageModeShared)
 
-        self.scene = Scene(device: device)
+        var idx: [UInt32] = [0,1,2, 2,1,3]
+        quadIndexBuffer = dev.makeBuffer(
+            bytes: &idx,
+            length: idx.count * MemoryLayout<UInt32>.stride,
+            options: .storageModeShared)
 
-        viewportSize = float2(
-            Float(metalKitView.drawableSize.width),
-            Float(metalKitView.drawableSize.height)
-        )
-        if viewportSize.x > 0 && viewportSize.y > 0 {
-            resizeTileBuffers()
-        }
+        scene = Scene(device: dev)
+        viewportSize = float2(Float(metalKitView.drawableSize.width),
+                              Float(metalKitView.drawableSize.height))
     }
 
-    // MARK: - Pipeline Creation
-
-    private func createPipelines() {
-        do {
-            guard
-                let projectFn = library.makeFunction(name: "projectGaussians"),
-                let binFn     = library.makeFunction(name: "binGaussians"),
-                let sortFn    = library.makeFunction(name: "sortTiles"),
-                let renderFn  = library.makeFunction(name: "renderTiles")
-            else {
-                print("Error: one or more Metal functions not found in library")
-                return
-            }
-            projectPSO = try device.makeComputePipelineState(function: projectFn)
-            binningPSO = try device.makeComputePipelineState(function: binFn)
-            sortPSO    = try device.makeComputePipelineState(function: sortFn)
-            renderPSO  = try device.makeComputePipelineState(function: renderFn)
-            print("All compute pipelines created successfully")
-        } catch {
-            print("Pipeline creation error: \(error)")
+    private func buildPipelines() {
+        // Compute: project splats
+        if let fn = library.makeFunction(name: "projectSplats") {
+            projectPSO = try? device.makeComputePipelineState(function: fn)
+            print(projectPSO != nil ? "projectSplats PSO OK" : "ERROR: projectSplats PSO failed")
+        } else {
+            print("ERROR: projectSplats function not found in Metal library")
         }
-    }
 
-    // MARK: - Scene Loading
+        // Render: vertex + fragment
+        guard let vfn = library.makeFunction(name: "splatVertex"),
+              let ffn = library.makeFunction(name: "splatFragment") else {
+            print("ERROR: splatVertex/splatFragment not found in Metal library"); return
+        }
+        let d = MTLRenderPipelineDescriptor()
+        d.vertexFunction   = vfn
+        d.fragmentFunction = ffn
+        d.colorAttachments[0].pixelFormat    = .bgra8Unorm_srgb
+        d.depthAttachmentPixelFormat         = .depth32Float
+
+        // Premultiplied-alpha blending
+        let ca = d.colorAttachments[0]!
+        ca.isBlendingEnabled           = true
+        ca.rgbBlendOperation           = .add
+        ca.alphaBlendOperation         = .add
+        ca.sourceRGBBlendFactor        = .one
+        ca.destinationRGBBlendFactor   = .oneMinusSourceAlpha
+        ca.sourceAlphaBlendFactor      = .one
+        ca.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+
+        renderPSO = try? device.makeRenderPipelineState(descriptor: d)
+        print(renderPSO != nil ? "Render PSO OK" : "ERROR: Render PSO failed")
+    }
 
     func loadScene(from url: URL) throws {
-        guard let scene = scene else {
-            throw RendererError.sceneNotInitialized
-        }
+        guard let scene else { throw RendererError.sceneNotInitialized }
         try scene.load(from: url)
 
-        print("Scene loaded — center: \(scene.center), radius: \(scene.radius)")
-        camera.focus(on: scene.center, radius: max(scene.radius, 0.1))
-        print("Camera position: \(camera.position), distance: \(camera.distance)")
+        let r = max(scene.radius, 0.5)
+        print("Scene loaded — center: \(scene.center), radius: \(r)")
 
-        resizeTileBuffers()
+        camera.target    = scene.center
+        camera.distance  = r * 2.5
+        camera.azimuth   = 0
+        camera.elevation = 0.3
+        camera.updateMatrices()
+        print("Camera distance set to: \(camera.distance)")
+
+        splatVertexBuffer = device.makeBuffer(
+            length: MemoryLayout<SplatVertex>.stride * scene.splatCount,
+            options: .storageModePrivate)
     }
-
-    // MARK: - MTKViewDelegate
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        viewportSize = float2(Float(size.width), Float(size.height))
+        viewportSize       = float2(Float(size.width), Float(size.height))
         camera.aspectRatio = Float(size.width) / max(1, Float(size.height))
         camera.updateMatrices()
-        resizeTileBuffers()
     }
-
-    private func resizeTileBuffers() {
-        guard viewportSize.x > 0 && viewportSize.y > 0 else { return }
-        let tilesX     = (Int(viewportSize.x) + tileSize - 1) / tileSize
-        let tilesY     = (Int(viewportSize.y) + tileSize - 1) / tileSize
-        let tileCount  = tilesX * tilesY
-        tileCountsBuffer = device.makeBuffer(
-            length: tileCount * MemoryLayout<UInt32>.stride,
-            options: .storageModePrivate
-        )
-        tileListBuffer = device.makeBuffer(
-            length: tileCount * maxGaussiansPerTile * MemoryLayout<UInt32>.stride,
-            options: .storageModePrivate
-        )
-        print("Tile buffers resized: \(Int(viewportSize.x))×\(Int(viewportSize.y)), tiles: \(tilesX)×\(tilesY)")
-    }
-
-    // MARK: - Draw
 
     func draw(in view: MTKView) {
-        guard
-            let scene           = scene,
-            scene.isLoaded,
-            let projectPSO      = projectPSO,
-            let binningPSO      = binningPSO,
-            let sortPSO         = sortPSO,
-            let renderPSO       = renderPSO,
-            let splatBuffer     = scene.splatBuffer,
-            let projectedBuffer = scene.projectedBuffer,
-            let tileCounts      = tileCountsBuffer,
-            let tileList        = tileListBuffer,
-            let camBuf          = cameraUniformsBuffer,
-            let settingsBuf     = splatSettingsBuffer,
-            let drawable        = view.currentDrawable,
-            let commandBuffer   = commandQueue.makeCommandBuffer(),
-            viewportSize.x > 0 && viewportSize.y > 0
+        guard let scene, scene.isLoaded,
+              let splatBuf  = scene.splatBuffer,
+              let vertBuf   = splatVertexBuffer,
+              let camBuf    = cameraBuffer,
+              let idxBuf    = quadIndexBuffer,
+              let rpd       = view.currentRenderPassDescriptor,
+              let drawable  = view.currentDrawable,
+              let cb        = commandQueue.makeCommandBuffer()
         else { return }
 
         frameCount += 1
-        updateCameraUniforms()
 
-        var renderCount = UInt32(scene.splatCount)
-        var config = RasterConfig(
-            screenWidth:        UInt32(viewportSize.x),
-            screenHeight:       UInt32(viewportSize.y),
-            tilesX:             UInt32((Int(viewportSize.x) + tileSize - 1) / tileSize),
-            tilesY:             UInt32((Int(viewportSize.y) + tileSize - 1) / tileSize),
-            tileSize:           UInt32(tileSize),
-            maxGaussiansPerTile: UInt32(maxGaussiansPerTile),
-            renderCount:        renderCount,
-            maxScreenRadius:    256
-        )
+        // Upload camera uniforms
+        var uni = camera.getUniforms(screenSize: viewportSize)
+        uni.modelMatrix = modelMatrix
+        let off = Int(frameCount % 3) * MemoryLayout<CameraUniforms>.stride
+        memcpy(camBuf.contents().advanced(by: off), &uni, MemoryLayout<CameraUniforms>.stride)
 
-        let camOffset = Int(frameCount % 3) * cameraUniformStride
+        let count = UInt32(scene.splatCount)
 
-        // Clear tile counts
-        if let blit = commandBuffer.makeBlitCommandEncoder() {
-            blit.fill(buffer: tileCounts, range: 0..<tileCounts.length, value: 0)
-            blit.endEncoding()
-        }
-
-        // 1. Project Gaussians → screen space
-        if let enc = commandBuffer.makeComputeCommandEncoder() {
-            enc.setComputePipelineState(projectPSO)
-            enc.setBuffer(splatBuffer,     offset: 0,         index: 0)
-            enc.setBuffer(projectedBuffer, offset: 0,         index: 1)
-            enc.setBuffer(camBuf,          offset: camOffset, index: 2)
-            enc.setBytes(&renderCount,     length: 4,         index: 3)
-            var step = UInt32(1)
-            enc.setBytes(&step,            length: 4,         index: 4)
-            enc.setBytes(&config,          length: MemoryLayout<RasterConfig>.stride,  index: 5)
-            enc.setBuffer(settingsBuf,     offset: 0,         index: 6)
+        // Pass 1: project (compute)
+        if let pso = projectPSO, let enc = cb.makeComputeCommandEncoder() {
+            enc.setComputePipelineState(pso)
+            enc.setBuffer(splatBuf, offset: 0,   index: 0)
+            enc.setBuffer(vertBuf,  offset: 0,   index: 1)
+            enc.setBuffer(camBuf,   offset: off, index: 2)
+            var n = count
+            enc.setBytes(&n, length: 4, index: 3)
             enc.dispatchThreadgroups(
-                MTLSize(width: (Int(renderCount) + 255) / 256, height: 1, depth: 1),
-                threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1)
-            )
+                MTLSize(width: (Int(count)+255)/256, height:1, depth:1),
+                threadsPerThreadgroup: MTLSize(width:256, height:1, depth:1))
             enc.endEncoding()
         }
 
-        // 2. Bin Gaussians into tiles
-        if let enc = commandBuffer.makeComputeCommandEncoder() {
-            enc.setComputePipelineState(binningPSO)
-            enc.setBuffer(projectedBuffer, offset: 0, index: 0)
-            enc.setBuffer(tileCounts,      offset: 0, index: 1)
-            enc.setBuffer(tileList,        offset: 0, index: 2)
-            enc.setBytes(&config, length: MemoryLayout<RasterConfig>.stride, index: 3)
-            enc.dispatchThreadgroups(
-                MTLSize(width: (Int(renderCount) + 255) / 256, height: 1, depth: 1),
-                threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1)
-            )
+        // Pass 2: render quads
+        let bg = splatSettings
+        rpd.colorAttachments[0].clearColor  = MTLClearColor(
+            red: Double(bg.bgColorR), green: Double(bg.bgColorG),
+            blue: Double(bg.bgColorB), alpha: 1)
+        rpd.colorAttachments[0].loadAction  = .clear
+        rpd.colorAttachments[0].storeAction = .store
+
+        if let pso = renderPSO, let enc = cb.makeRenderCommandEncoder(descriptor: rpd) {
+            enc.setRenderPipelineState(pso)
+            enc.setVertexBuffer(vertBuf, offset: 0,   index: 0)
+            enc.setVertexBuffer(camBuf,  offset: off, index: 1)
+            enc.drawIndexedPrimitives(
+                type: .triangle, indexCount: 6, indexType: .uint32,
+                indexBuffer: idxBuf, indexBufferOffset: 0,
+                instanceCount: Int(count))
             enc.endEncoding()
         }
 
-        // 3. Sort each tile back-to-front
-        if let enc = commandBuffer.makeComputeCommandEncoder() {
-            enc.setComputePipelineState(sortPSO)
-            enc.setBuffer(projectedBuffer, offset: 0, index: 0)
-            enc.setBuffer(tileCounts,      offset: 0, index: 1)
-            enc.setBuffer(tileList,        offset: 0, index: 2)
-            enc.setBytes(&config, length: MemoryLayout<RasterConfig>.stride, index: 3)
-            let totalTiles = Int(config.tilesX * config.tilesY)
-            enc.dispatchThreadgroups(
-                MTLSize(width: (totalTiles + 31) / 32, height: 1, depth: 1),
-                threadsPerThreadgroup: MTLSize(width: 32, height: 1, depth: 1)
-            )
-            enc.endEncoding()
-        }
-
-        // 4. Render tiles → drawable texture
-        if let enc = commandBuffer.makeComputeCommandEncoder() {
-            enc.setComputePipelineState(renderPSO)
-            enc.setBuffer(projectedBuffer, offset: 0, index: 0)
-            enc.setBuffer(tileCounts,      offset: 0, index: 1)
-            enc.setBuffer(tileList,        offset: 0, index: 2)
-            enc.setBytes(&config,          length: MemoryLayout<RasterConfig>.stride, index: 3)
-            enc.setBuffer(settingsBuf,     offset: 0, index: 4)
-            enc.setTexture(drawable.texture, index: 0)
-            enc.dispatchThreadgroups(
-                MTLSize(width: Int(config.tilesX), height: Int(config.tilesY), depth: 1),
-                threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1)
-            )
-            enc.endEncoding()
-        }
-
-        commandBuffer.present(drawable)
-        commandBuffer.commit()
+        cb.present(drawable)
+        cb.commit()
     }
-
-    // MARK: - Camera Uniforms
-
-    private func updateCameraUniforms() {
-        guard let camBuf = cameraUniformsBuffer, let settingsBuf = splatSettingsBuffer else { return }
-
-        // Build camera uniforms with current model matrix
-        var uniforms = camera.getUniforms(screenSize: viewportSize)
-        uniforms.modelMatrix = modelMatrix
-
-        let offset = Int(frameCount % 3) * cameraUniformStride
-        memcpy(camBuf.contents().advanced(by: offset),
-               &uniforms,
-               MemoryLayout<CameraUniforms>.stride)
-
-        // Write the ACTUAL splatSettings (not hardcoded values)
-        var settings = splatSettings
-        memcpy(settingsBuf.contents(), &settings, MemoryLayout<SplatSettings>.stride)
-    }
-
-    // MARK: - Input Handling
 
     func handleMouseDown(at p: NSPoint, button: MouseButton) {
-        let pos = float2(Float(p.x), Float(p.y))
-        // Always record position for transform mode delta tracking
-        lastTransformMousePos = pos
-        camera.mouseDown(at: pos)
+        lastMouse = float2(Float(p.x), Float(p.y))
+        camera.mouseDown(at: lastMouse)
     }
-
     func handleMouseDrag(to p: NSPoint, button: MouseButton) {
-        let pos   = float2(Float(p.x), Float(p.y))
-        let delta = pos - lastTransformMousePos
-        lastTransformMousePos = pos
-
+        let pos = float2(Float(p.x), Float(p.y))
+        let d   = pos - lastMouse; lastMouse = pos
         if activeTransformMode != .none {
             switch activeTransformMode {
-            case .rotate:
-                sceneRotation.y += delta.x * 0.005
-                sceneRotation.x += delta.y * 0.005
-            case .scale:
-                sceneScale *= (1.0 + delta.y * 0.005)
-                sceneScale = max(0.01, min(100.0, sceneScale))
-            case .translate:
-                sceneTranslation.x += delta.x * 0.01 * camera.distance
-                sceneTranslation.y -= delta.y * 0.01 * camera.distance
-            case .none:
-                break
+            case .rotate:    sceneRot.y += d.x*0.005; sceneRot.x += d.y*0.005
+            case .scale:     sceneScale = max(0.01,min(100,sceneScale*(1+d.y*0.005)))
+            case .translate: sceneTrans.x += d.x*0.01*camera.distance
+                             sceneTrans.y -= d.y*0.01*camera.distance
+            case .none: break
             }
             return
         }
-
         camera.mouseDrag(to: pos, button: button)
     }
-
-    func handleMouseUp() {
-        camera.mouseUp()
-    }
-
-    func handleScroll(deltaY: CGFloat) {
-        camera.scroll(deltaY: Float(deltaY))
-    }
-
-    func resetSceneTransform() {
-        sceneRotation    = .zero
-        sceneScale       = 1.0
-        sceneTranslation = .zero
-    }
+    func handleMouseUp()               { camera.mouseUp() }
+    func handleScroll(deltaY: CGFloat) { camera.scroll(deltaY: Float(deltaY)) }
+    func resetSceneTransform()         { sceneRot = .zero; sceneScale = 1; sceneTrans = .zero }
 }
