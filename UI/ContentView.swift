@@ -6,6 +6,11 @@ struct ContentView: View {
     @State private var isFilePickerPresented = false
     @State private var transformMode: TransformMode = .none
     @State private var showPropertiesPanel = false
+    @State private var showTimeline = false
+    @State private var isSaveAnimPresented = false
+    @State private var isLoadAnimPresented = false
+    @State private var animErrorMsg: String?
+    @State private var showAnimError = false
     
     // Splat settings (bidirectionally synced with renderer)
     @State private var scaleMultiplier: Double = 1.0
@@ -80,6 +85,34 @@ struct ContentView: View {
                         .controlSize(.small)
                         .help("Toggle splat properties panel")
                     }
+
+                    Divider().frame(height: 20)
+
+                    // Timeline toggle
+                    Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showTimeline.toggle() } }) {
+                        Label("Timeline", systemImage: "film")
+                            .labelStyle(.iconOnly)
+                    }
+                    .buttonStyle(showTimeline ? .borderedProminent : .bordered)
+                    .controlSize(.small)
+                    .help("Toggle animation timeline")
+
+                    // Save / Load animation
+                    Button(action: { isSaveAnimPresented = true }) {
+                        Label("Save Anim", systemImage: "square.and.arrow.down")
+                            .labelStyle(.iconOnly)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Save animation (.gsanim)")
+
+                    Button(action: { isLoadAnimPresented = true }) {
+                        Label("Load Anim", systemImage: "square.and.arrow.up")
+                            .labelStyle(.iconOnly)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Load animation (.gsanim)")
                 }
                 
                 Spacer()
@@ -185,8 +218,16 @@ struct ContentView: View {
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
+
+            // Timeline panel — shown when toggled
+            if showTimeline, let animSystem = viewModel.animationSystem {
+                Divider()
+                TimelineView(animationSystem: animSystem)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .frame(minWidth: 800, minHeight: 600)
+        // PLY file picker
         .fileImporter(
             isPresented: $isFilePickerPresented,
             allowedContentTypes: [UTType(filenameExtension: "ply") ?? .data],
@@ -194,15 +235,58 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                if let url = urls.first {
-                    viewModel.loadFile(from: url)
-                }
+                if let url = urls.first { viewModel.loadFile(from: url) }
             case .failure(let error):
                 print("File picker error: \(error)")
             }
         }
+        // Save animation
+        .onChange(of: isSaveAnimPresented) { show in
+            guard show else { return }
+            isSaveAnimPresented = false
+            guard let anim = viewModel.animationSystem else { return }
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [UTType(filenameExtension: "gsanim") ?? .json]
+            panel.nameFieldStringValue = "animation.gsanim"
+            panel.begin { response in
+                guard response == .OK, let url = panel.url else { return }
+                do {
+                    try anim.save(to: url)
+                } catch {
+                    animErrorMsg = error.localizedDescription
+                    showAnimError = true
+                }
+            }
+        }
+        // Load animation
+        .fileImporter(
+            isPresented: $isLoadAnimPresented,
+            allowedContentTypes: [UTType(filenameExtension: "gsanim") ?? .json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first, let anim = viewModel.animationSystem else { return }
+                do {
+                    let didAccess = url.startAccessingSecurityScopedResource()
+                    defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+                    try anim.load(from: url)
+                } catch {
+                    animErrorMsg = error.localizedDescription
+                    showAnimError = true
+                }
+            case .failure(let error):
+                animErrorMsg = error.localizedDescription
+                showAnimError = true
+            }
+        }
+        .alert("Animation Error", isPresented: $showAnimError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(animErrorMsg ?? "Unknown error")
+        }
     }
-    
+
     // MARK: - Properties Panel
     
     private var propertiesPanel: some View {

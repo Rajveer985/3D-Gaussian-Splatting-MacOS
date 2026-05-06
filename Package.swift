@@ -7,6 +7,9 @@ let package = Package(
     products: [
         .executable(name: "GaussianSplatViewer", targets: ["GaussianSplatViewer"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/typelift/SwiftCheck.git", from: "0.12.0")
+    ],
     targets: [
         .executableTarget(
             name: "GaussianSplatViewer",
@@ -14,6 +17,13 @@ let package = Package(
             resources: [
                 .process("Shaders")
             ]
+        ),
+        .testTarget(
+            name: "AnimationSystem",
+            dependencies: [
+                .product(name: "SwiftCheck", package: "SwiftCheck")
+            ],
+            path: "Tests/AnimationSystem"
         )
     ]
 )

@@ -12,6 +12,7 @@ class Camera {
     var distance: Float
     var azimuth: Float    // Horizontal angle (radians)
     var elevation: Float  // Vertical angle (radians)
+    var roll: Float = 0   // Roll angle (radians); applied as a rotation around the view axis
     
     // Projection parameters
     var fovDegrees: Float
@@ -66,6 +67,23 @@ class Camera {
         let y = distance * sin(elevation)
         let z = distance * cos(elevation) * cos(azimuth)
         position = target + float3(x, y, z)
+        
+        // Apply roll: rotate the up vector around the view axis
+        let cosR = cos(roll)
+        let sinR = sin(roll)
+        let viewDir = normalize(float3(x, y, z))
+        let worldUp = float3(0, 1, 0)
+        let rightCandidate = cross(worldUp, viewDir)
+        // Guard against gimbal lock when looking straight up/down
+        let right = simd_length(rightCandidate) > 1e-6
+            ? normalize(rightCandidate)
+            : float3(1, 0, 0)
+        // Rodrigues' rotation of worldUp around viewDir by roll angle
+        up = float3(
+            cosR * worldUp.x - sinR * right.x,
+            cosR * worldUp.y - sinR * right.y,
+            cosR * worldUp.z - sinR * right.z
+        )
         
         // Build view matrix
         viewMatrix = float4x4.lookAt(eye: position, center: target, up: up)

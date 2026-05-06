@@ -16,7 +16,11 @@ class Renderer: NSObject, MTKViewDelegate {
     
     var scene: Scene?
     var camera: Camera
-    
+
+    /// Weak reference to the animation system. Injected after construction.
+    /// When isAnimating is true, mouse/keyboard input is suppressed.
+    weak var animationSystem: AnimationSystem?
+
     var viewportSize: float2 = float2(800, 600)
     var frameCount: UInt64 = 0
     
@@ -208,11 +212,13 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     func handleMouseDown(at point: NSPoint, button: MouseButton) {
+        guard animationSystem?.isAnimating != true else { return }
         let pos = float2(Float(point.x), Float(point.y))
         camera.mouseDown(at: pos)
     }
     
     func handleMouseDrag(to point: NSPoint, button: MouseButton) {
+        guard animationSystem?.isAnimating != true else { return }
         let pos = float2(Float(point.x), Float(point.y))
         camera.mouseDrag(to: pos, button: button)
     }

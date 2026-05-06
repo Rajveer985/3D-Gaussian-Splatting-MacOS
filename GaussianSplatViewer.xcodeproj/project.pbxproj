@@ -16,6 +16,25 @@
 		CF1E1C822F90595700C6F30D /* Renderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1E1C722F90595700C6F30D /* Renderer.swift */; };
 		CF1E1C832F90595700C6F30D /* Scene.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1E1C752F90595700C6F30D /* Scene.swift */; };
 		CF1E1C842F90595700C6F30D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1E1C792F90595700C6F30D /* ContentView.swift */; };
+		AA000001000000000000001 /* AnimatableProperty.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000002 /* AnimatableProperty.swift */; };
+		AA000001000000000000003 /* InterpolationMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000004 /* InterpolationMode.swift */; };
+		AA000001000000000000005 /* BezierHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000006 /* BezierHandle.swift */; };
+		AA000001000000000000007 /* Keyframe.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000008 /* Keyframe.swift */; };
+		AA000001000000000000009 /* CameraState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000010 /* CameraState.swift */; };
+		AA000001000000000000011 /* KeyframeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000012 /* KeyframeStore.swift */; };
+		AA000001000000000000013 /* InterpolationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000014 /* InterpolationEngine.swift */; };
+		AA000001000000000000015 /* Timeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000016 /* Timeline.swift */; };
+		AA000001000000000000017 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000018 /* PlaybackEngine.swift */; };
+		AA000001000000000000019 /* AnimationSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000020 /* AnimationSystem.swift */; };
+		AA000001000000000000021 /* PersistenceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000022 /* PersistenceManager.swift */; };
+		AA000001000000000000023 /* PlaybackControlsBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000024 /* PlaybackControlsBar.swift */; };
+		AA000001000000000000025 /* TimelineRuler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000026 /* TimelineRuler.swift */; };
+		AA000001000000000000027 /* KeyframeDiamond.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000028 /* KeyframeDiamond.swift */; };
+		AA000001000000000000029 /* PropertyTrackRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000030 /* PropertyTrackRow.swift */; };
+		AA000001000000000000031 /* ScrubberLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000032 /* ScrubberLine.swift */; };
+		AA000001000000000000033 /* TimelineTracksArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000034 /* TimelineTracksArea.swift */; };
+		AA000001000000000000035 /* GraphEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000036 /* GraphEditorView.swift */; };
+		AA000001000000000000037 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000038 /* TimelineView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +67,25 @@
 		CF1E1C772F90595700C6F30D /* GaussianSplat.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = GaussianSplat.metal; sourceTree = "<group>"; };
 		CF1E1C792F90595700C6F30D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CF1E1C7A2F90595700C6F30D /* ViewportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportView.swift; sourceTree = "<group>"; };
+		AA000001000000000000002 /* AnimatableProperty.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatableProperty.swift; sourceTree = "<group>"; };
+		AA000001000000000000004 /* InterpolationMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterpolationMode.swift; sourceTree = "<group>"; };
+		AA000001000000000000006 /* BezierHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BezierHandle.swift; sourceTree = "<group>"; };
+		AA000001000000000000008 /* Keyframe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keyframe.swift; sourceTree = "<group>"; };
+		AA000001000000000000010 /* CameraState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraState.swift; sourceTree = "<group>"; };
+		AA000001000000000000012 /* KeyframeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyframeStore.swift; sourceTree = "<group>"; };
+		AA000001000000000000014 /* InterpolationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterpolationEngine.swift; sourceTree = "<group>"; };
+		AA000001000000000000016 /* Timeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timeline.swift; sourceTree = "<group>"; };
+		AA000001000000000000018 /* PlaybackEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEngine.swift; sourceTree = "<group>"; };
+		AA000001000000000000020 /* AnimationSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationSystem.swift; sourceTree = "<group>"; };
+		AA000001000000000000022 /* PersistenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceManager.swift; sourceTree = "<group>"; };
+		AA000001000000000000024 /* PlaybackControlsBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControlsBar.swift; sourceTree = "<group>"; };
+		AA000001000000000000026 /* TimelineRuler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineRuler.swift; sourceTree = "<group>"; };
+		AA000001000000000000028 /* KeyframeDiamond.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyframeDiamond.swift; sourceTree = "<group>"; };
+		AA000001000000000000030 /* PropertyTrackRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyTrackRow.swift; sourceTree = "<group>"; };
+		AA000001000000000000032 /* ScrubberLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubberLine.swift; sourceTree = "<group>"; };
+		AA000001000000000000034 /* TimelineTracksArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineTracksArea.swift; sourceTree = "<group>"; };
+		AA000001000000000000036 /* GraphEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphEditorView.swift; sourceTree = "<group>"; };
+		AA000001000000000000038 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,6 +122,7 @@
 				CF1E1C762F90595700C6F30D /* Scene */,
 				CF1E1C782F90595700C6F30D /* Shaders */,
 				CF1E1C7B2F90595700C6F30D /* UI */,
+				AA000001000000000000040 /* Animation */,
 				CF1E1C452F9057F600C6F30D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -137,8 +176,42 @@
 			children = (
 				CF1E1C792F90595700C6F30D /* ContentView.swift */,
 				CF1E1C7A2F90595700C6F30D /* ViewportView.swift */,
+				AA000001000000000000039 /* Timeline */,
 			);
 			path = UI;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000039 /* Timeline */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000024 /* PlaybackControlsBar.swift */,
+				AA000001000000000000026 /* TimelineRuler.swift */,
+				AA000001000000000000028 /* KeyframeDiamond.swift */,
+				AA000001000000000000030 /* PropertyTrackRow.swift */,
+				AA000001000000000000032 /* ScrubberLine.swift */,
+				AA000001000000000000034 /* TimelineTracksArea.swift */,
+				AA000001000000000000036 /* GraphEditorView.swift */,
+				AA000001000000000000038 /* TimelineView.swift */,
+			);
+			path = Timeline;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000040 /* Animation */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000002 /* AnimatableProperty.swift */,
+				AA000001000000000000004 /* InterpolationMode.swift */,
+				AA000001000000000000006 /* BezierHandle.swift */,
+				AA000001000000000000008 /* Keyframe.swift */,
+				AA000001000000000000010 /* CameraState.swift */,
+				AA000001000000000000012 /* KeyframeStore.swift */,
+				AA000001000000000000014 /* InterpolationEngine.swift */,
+				AA000001000000000000016 /* Timeline.swift */,
+				AA000001000000000000018 /* PlaybackEngine.swift */,
+				AA000001000000000000020 /* AnimationSystem.swift */,
+				AA000001000000000000022 /* PersistenceManager.swift */,
+			);
+			path = Animation;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -285,6 +358,25 @@
 				CF1E1C822F90595700C6F30D /* Renderer.swift in Sources */,
 				CF1E1C832F90595700C6F30D /* Scene.swift in Sources */,
 				CF1E1C842F90595700C6F30D /* ContentView.swift in Sources */,
+				AA000001000000000000001 /* AnimatableProperty.swift in Sources */,
+				AA000001000000000000003 /* InterpolationMode.swift in Sources */,
+				AA000001000000000000005 /* BezierHandle.swift in Sources */,
+				AA000001000000000000007 /* Keyframe.swift in Sources */,
+				AA000001000000000000009 /* CameraState.swift in Sources */,
+				AA000001000000000000011 /* KeyframeStore.swift in Sources */,
+				AA000001000000000000013 /* InterpolationEngine.swift in Sources */,
+				AA000001000000000000015 /* Timeline.swift in Sources */,
+				AA000001000000000000017 /* PlaybackEngine.swift in Sources */,
+				AA000001000000000000019 /* AnimationSystem.swift in Sources */,
+				AA000001000000000000021 /* PersistenceManager.swift in Sources */,
+				AA000001000000000000023 /* PlaybackControlsBar.swift in Sources */,
+				AA000001000000000000025 /* TimelineRuler.swift in Sources */,
+				AA000001000000000000027 /* KeyframeDiamond.swift in Sources */,
+				AA000001000000000000029 /* PropertyTrackRow.swift in Sources */,
+				AA000001000000000000031 /* ScrubberLine.swift in Sources */,
+				AA000001000000000000033 /* TimelineTracksArea.swift in Sources */,
+				AA000001000000000000035 /* GraphEditorView.swift in Sources */,
+				AA000001000000000000037 /* TimelineView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -9,6 +9,7 @@ class Camera {
     var distance:    Float = 5
     var azimuth:     Float = 0
     var elevation:   Float = 0
+    var roll:        Float = 0   // radians; rotation around the view axis
 
     var fovDegrees:  Float = 60
     var aspectRatio: Float = 1
@@ -46,6 +47,16 @@ class Camera {
         let y = distance * sin(elevation)
         let z = distance * cos(elevation) * cos(azimuth)
         position = target + float3(x, y, z)
+
+        // Apply roll: rotate the up vector around the view axis
+        let cosR = cos(roll), sinR = sin(roll)
+        let viewDir = normalize(float3(x, y, z))
+        let worldUp = float3(0, 1, 0)
+        let rightCandidate = cross(worldUp, viewDir)
+        let right = simd_length(rightCandidate) > 1e-6 ? normalize(rightCandidate) : float3(1, 0, 0)
+        up = float3(cosR * worldUp.x - sinR * right.x,
+                    cosR * worldUp.y - sinR * right.y,
+                    cosR * worldUp.z - sinR * right.z)
 
         viewMatrix     = float4x4.lookAt(eye: position, center: target, up: up)
         projMatrix     = float4x4.perspective(

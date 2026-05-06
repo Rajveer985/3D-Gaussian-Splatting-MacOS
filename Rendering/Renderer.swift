@@ -25,6 +25,9 @@ class Renderer: NSObject, MTKViewDelegate {
     var frameCount:   UInt64 = 0
     var splatSettings = SplatSettings()
 
+    /// Injected after construction. When isAnimating, mouse input is suppressed.
+    weak var animationSystem: AnimationSystem?
+
     var activeTransformMode: TransformMode = .none
     private var sceneRot:   float3 = .zero
     private var sceneScale: Float  = 1.0
@@ -219,10 +222,12 @@ class Renderer: NSObject, MTKViewDelegate {
     }
 
     func handleMouseDown(at p: NSPoint, button: MouseButton) {
+        guard animationSystem?.isAnimating != true else { return }
         lastMouse = float2(Float(p.x), Float(p.y))
         camera.mouseDown(at: lastMouse)
     }
     func handleMouseDrag(to p: NSPoint, button: MouseButton) {
+        guard animationSystem?.isAnimating != true else { return }
         let pos = float2(Float(p.x), Float(p.y))
         let d   = pos - lastMouse; lastMouse = pos
         if activeTransformMode != .none {

@@ -18,6 +18,11 @@ struct ViewportView: NSViewRepresentable {
         if let renderer = Renderer(metalKitView: mtkView) {
             context.coordinator.renderer = renderer
             viewModel.renderer = renderer
+
+            // Create AnimationSystem, wire it to the renderer and camera
+            let animSystem = AnimationSystem(camera: renderer.camera)
+            renderer.animationSystem = animSystem
+            viewModel.animationSystem = animSystem
         }
 
         mtkView.window?.makeFirstResponder(mtkView)
@@ -144,7 +149,8 @@ class ViewModel: ObservableObject {
     @Published var splatCount: Int = 0
     @Published var fps: Double = 0
     @Published var fileName: String = "No file loaded"
-    
+    @Published var animationSystem: AnimationSystem?
+
     var renderer: Renderer?
     
     func loadFile(from url: URL) {
