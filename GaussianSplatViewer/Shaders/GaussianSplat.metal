@@ -303,8 +303,7 @@ kernel void projectSplats(
     // SH evaluation produces sRGB-space colors (matching the training pipeline).
     // Metal's sRGB framebuffer (.bgra8Unorm_srgb) expects LINEAR input and applies
     // gamma automatically. Convert sRGB → linear using fast gamma-2.2 approximation.
-    // Use multiply instead of pow() for performance — pow() is ~10x slower on GPU.
-    color = color * color;  // gamma 2.0 approximation — fast, visually close to 2.2
+    color = pow(color, float3(2.2f));
 
     verts[gid].screenPos = sp;
     verts[gid].conic_xy  = float2(cov[1][1]*di, -cov[0][1]*di);
@@ -332,10 +331,7 @@ kernel void projectSplats(
     float3 camForward = -float3(cam.viewMatrix[0].z, cam.viewMatrix[1].z, cam.viewMatrix[2].z);
     float depth = dot(wp - cam.camPos, camForward);
 
-    float pixelWorldSize = abs(tz) / max(fx, 1.0f);
-    float biasedDepth = depth - r * pixelWorldSize * 0.05f;
-
-    float normDepth = clamp(biasedDepth / max(settings.farClip, 1.0f), 0.0f, 1.0f);
+    float normDepth = clamp(depth / max(settings.farClip, 1.0f), 0.0f, 1.0f);
 
     // sqrt maps more bits to near-camera range
     uint depthBits = uint(sqrt(normDepth) * float(0x000FFFFFu)) << 12u;

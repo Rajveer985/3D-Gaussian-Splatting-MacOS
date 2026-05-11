@@ -54,13 +54,13 @@ class Renderer: NSObject, MTKViewDelegate {
     private var lastSortCamPos:     float3 = float3(repeating: .infinity)
     private var lastSortCamForward: float3 = float3(0, 0, -1)
     private let sortPositionEpsilon: Float  = 0.005   // 5mm world units — barely perceptible quality loss
-    private let sortDirectionEpsilon: Float = 0.0002  // ~0.01 degrees — rotation jitter more visible
+    private let sortDirectionEpsilon: Float = 0.00001  // catches even 1-pixel rotation
     private var sortedIndexBuffer:  MTLBuffer?  // last sorted result buffer
 
     // Triple-buffering semaphore: prevents CPU from overwriting GPU-active buffer slots.
     // Without this, CPU can run 5–10 frames ahead on fast M1 Pro, causing matrix tearing.
     private let maxFramesInFlight = 3
-    private let frameSemaphore = DispatchSemaphore(value: 3)
+    private let frameSemaphore = DispatchSemaphore(value: 2)
 
     private var modelMatrix: float4x4 {
         float4x4.translation(sceneTranslation)
