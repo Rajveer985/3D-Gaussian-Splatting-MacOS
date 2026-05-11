@@ -89,13 +89,23 @@ struct ContentView: View {
                     Divider().frame(height: 20)
 
                     // Timeline toggle
-                    Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showTimeline.toggle() } }) {
-                        Label("Timeline", systemImage: "film")
-                            .labelStyle(.iconOnly)
+                    if showTimeline {
+                        Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showTimeline.toggle() } }) {
+                            Label("Timeline", systemImage: "film")
+                                .labelStyle(.iconOnly)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .help("Toggle animation timeline")
+                    } else {
+                        Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showTimeline.toggle() } }) {
+                            Label("Timeline", systemImage: "film")
+                                .labelStyle(.iconOnly)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .help("Toggle animation timeline")
                     }
-                    .buttonStyle(showTimeline ? .borderedProminent : .bordered)
-                    .controlSize(.small)
-                    .help("Toggle animation timeline")
 
                     // Save / Load animation
                     Button(action: { isSaveAnimPresented = true }) {

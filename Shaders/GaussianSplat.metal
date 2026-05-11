@@ -216,8 +216,8 @@ kernel void projectSplats(
     float2 diagVec = normalize(float2(b, lambda1 - a));
 
     // Half-axis lengths clamped to 1024 px (prevents exploding splats near camera)
-    float2 majorAxis = min(sqrt(2.0f * lambda1), 1024.0f) * diagVec;
-    float2 minorAxis = min(sqrt(2.0f * lambda2), 1024.0f) * float2(diagVec.y, -diagVec.x);
+    float2 majorAxis = min(3.0f * sqrt(max(lambda1, 0.0f)), 1024.0f) * diagVec;
+    float2 minorAxis = min(3.0f * sqrt(max(lambda2, 0.0f)), 1024.0f) * float2(diagVec.y, -diagVec.x);
 
     // Inverse 2x2 covariance (conic) for the fragment shader
     float det = a * c2 - b * b;

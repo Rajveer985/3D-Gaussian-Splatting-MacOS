@@ -323,8 +323,8 @@ kernel void projectSplats(
     float lambda2   = eigMid - eigRadius;
     float2 diagVec  = (abs(b) > 1e-6f) ? normalize(float2(b, lambda1 - a))
                                         : float2(1.0f, 0.0f);
-    verts[gid].majorAxis = min(sqrt(2.0f * max(lambda1, 0.0f)), 1024.0f) * diagVec;
-    verts[gid].minorAxis = min(sqrt(2.0f * max(lambda2, 0.0f)), 1024.0f) * float2(diagVec.y, -diagVec.x);
+    verts[gid].majorAxis = min(3.0f * sqrt(max(lambda1, 0.0f)), 1024.0f) * diagVec;
+    verts[gid].minorAxis = min(3.0f * sqrt(max(lambda2, 0.0f)), 1024.0f) * float2(diagVec.y, -diagVec.x);
 
     // Depth key: 20-bit sqrt-mapped depth | 12-bit splat index tie-breaker = 32 bits.
     // 20-bit depth = 1M depth levels. 12-bit ID = 4096 tie-breaker states.

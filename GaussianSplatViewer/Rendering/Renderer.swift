@@ -19,6 +19,7 @@ class Renderer: NSObject, MTKViewDelegate {
     var prefixSumPSO:    MTLComputePipelineState?
     var radixScatterPSO: MTLComputePipelineState?
     var renderPSO:       MTLRenderPipelineState?
+    var depthStencilState: MTLDepthStencilState?
 
     // MARK: - Buffers
     var splatVertexBuffer: MTLBuffer?
@@ -158,6 +159,14 @@ class Renderer: NSObject, MTKViewDelegate {
 
         renderPSO = try? device.makeRenderPipelineState(descriptor: d)
         print(renderPSO != nil ? "✓ Render PSO" : "✗ Render PSO failed")
+
+        // Depth stencil: NEVER write depth (splats are transparent, sorted back-to-front).
+        // Compare = always (all fragments pass — sorting handles draw order).
+        let dsDesc = MTLDepthStencilDescriptor()
+        dsDesc.isDepthWriteEnabled  = false
+        dsDesc.depthCompareFunction = .always
+        depthStencilState = device.makeDepthStencilState(descriptor: dsDesc)
+        print(depthStencilState != nil ? "✓ Depth stencil state (write=off)" : "✗ Depth stencil state failed")
     }
 
     // MARK: - Scene loading
@@ -381,9 +390,14 @@ class Renderer: NSObject, MTKViewDelegate {
             alpha: 1)
         rpd.colorAttachments[0].loadAction  = .clear
         rpd.colorAttachments[0].storeAction = .store
+        rpd.depthAttachment.loadAction  = .clear
+        rpd.depthAttachment.storeAction = .dontCare   // never read depth back → don't waste bandwidth
 
         if let pso = renderPSO, let enc = cb.makeRenderCommandEncoder(descriptor: rpd) {
             enc.setRenderPipelineState(pso)
+            if let dss = depthStencilState {
+                enc.setDepthStencilState(dss)
+            }
             enc.setVertexBuffer(sortedBuf, offset: 0,      index: 0)
             enc.setVertexBuffer(vertBuf,   offset: 0,      index: 1)
             enc.setVertexBuffer(camBuf,    offset: camOff, index: 2)

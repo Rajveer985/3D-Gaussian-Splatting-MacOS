@@ -14,6 +14,7 @@ class Renderer: NSObject, MTKViewDelegate {
 
     var projectPSO: MTLComputePipelineState?
     var renderPSO:  MTLRenderPipelineState?
+    var depthStencilState: MTLDepthStencilState?
 
     var splatVertexBuffer:  MTLBuffer?
     var cameraBuffer:       MTLBuffer?
@@ -115,6 +116,12 @@ class Renderer: NSObject, MTKViewDelegate {
 
         renderPSO = try? device.makeRenderPipelineState(descriptor: d)
         print(renderPSO != nil ? "Render PSO OK" : "ERROR: Render PSO failed")
+
+        // Depth stencil: NEVER write depth (splats are transparent, sorted back-to-front).
+        let dsDesc = MTLDepthStencilDescriptor()
+        dsDesc.isDepthWriteEnabled  = false
+        dsDesc.depthCompareFunction = .always
+        depthStencilState = device.makeDepthStencilState(descriptor: dsDesc)
     }
 
     func loadScene(from url: URL) throws {
@@ -169,14 +176,16 @@ class Renderer: NSObject, MTKViewDelegate {
             let invModel = mm.inverse
 
             // Camera position in model-local space
-            let camPosLocal = (invModel * float4(camera.position.x,
-                                                 camera.position.y,
-                                                 camera.position.z, 1)).xyz
+            let camPos4 = invModel * float4(camera.position.x,
+                                             camera.position.y,
+                                             camera.position.z, 1)
+            let camPosLocal = float3(camPos4.x, camPos4.y, camPos4.z)
 
             // Camera forward in model-local space (no translation needed for direction)
             let vm = camera.viewMatrix
             let fwdWorld = normalize(-float3(vm.columns.2.x, vm.columns.2.y, vm.columns.2.z))
-            let fwdLocal = normalize((invModel * float4(fwdWorld.x, fwdWorld.y, fwdWorld.z, 0)).xyz)
+            let fwd4 = invModel * float4(fwdWorld.x, fwdWorld.y, fwdWorld.z, 0)
+            let fwdLocal = normalize(float3(fwd4.x, fwd4.y, fwd4.z))
 
             scene.sortSplats(cameraPosition: camPosLocal, forward: fwdLocal)
             lastSortFrame = frameCount
@@ -205,9 +214,14 @@ class Renderer: NSObject, MTKViewDelegate {
             blue: Double(bg.bgColorB), alpha: 1)
         rpd.colorAttachments[0].loadAction  = .clear
         rpd.colorAttachments[0].storeAction = .store
+        rpd.depthAttachment.loadAction  = .clear
+        rpd.depthAttachment.storeAction = .dontCare
 
         if let pso = renderPSO, let enc = cb.makeRenderCommandEncoder(descriptor: rpd) {
             enc.setRenderPipelineState(pso)
+            if let dss = depthStencilState {
+                enc.setDepthStencilState(dss)
+            }
             enc.setVertexBuffer(vertBuf, offset: 0,   index: 0)
             enc.setVertexBuffer(camBuf,  offset: off, index: 1)
             enc.drawIndexedPrimitives(
