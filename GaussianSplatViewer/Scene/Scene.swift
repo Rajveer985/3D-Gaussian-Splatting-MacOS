@@ -70,12 +70,32 @@ class Scene {
         
         print("  Splat buffer size: \(splatBufferSize / 1024 / 1024) MB")
         
-        guard let buffer = device.makeBuffer(bytes: &gpuData, 
-                                             length: splatBufferSize, 
-                                             options: .storageModeShared) else {
+        // Create splat data buffer — storageModePrivate for GPU-only access.
+        // The buffer is written once at load time and then only read by the GPU compute shader.
+        // We stage through a shared buffer and blit-copy to private for optimal GPU throughput.
+        guard let stagingBuffer = device.makeBuffer(bytes: &gpuData,
+                                                     length: splatBufferSize,
+                                                     options: .storageModeShared) else {
+            print("Error: Failed to create staging buffer")
+            throw SceneError.failedToCreateBuffer
+        }
+        guard let buffer = device.makeBuffer(length: splatBufferSize,
+                                              options: .storageModePrivate) else {
             print("Error: Failed to create splat buffer")
             throw SceneError.failedToCreateBuffer
         }
+        // Blit staging → private
+        guard let cq = device.makeCommandQueue(),
+              let cb = cq.makeCommandBuffer(),
+              let blit = cb.makeBlitCommandEncoder() else {
+            print("Error: Failed to create blit encoder for staging copy")
+            throw SceneError.failedToCreateBuffer
+        }
+        blit.copy(from: stagingBuffer, sourceOffset: 0,
+                  to: buffer, destinationOffset: 0, size: splatBufferSize)
+        blit.endEncoding()
+        cb.commit()
+        cb.waitUntilCompleted()
         
         // Create projected data buffer (for compute shader output)
         let projectedBufferSize = MemoryLayout<ProjectedGaussian>.stride * splats.count

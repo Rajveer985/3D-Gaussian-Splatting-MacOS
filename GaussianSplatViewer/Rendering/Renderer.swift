@@ -50,12 +50,17 @@ class Renderer: NSObject, MTKViewDelegate {
     private var computeThreadgroupWidth = 512
 
     // Sort-skip optimisation: only re-sort when camera moves enough to matter.
-    // Small epsilon = sort fires on every meaningful camera movement = less jitter.
-    // Large epsilon = fewer sorts = better perf but more stale-order artifacts.
+    // Split thresholds: position needs less frequent sorting than rotation.
     private var lastSortCamPos:     float3 = float3(repeating: .infinity)
     private var lastSortCamForward: float3 = float3(0, 0, -1)
-    private let sortEpsilon: Float = 0.0001  // tight epsilon — fat splats (0.6f LPF) need more frequent sorts during manual nav
+    private let sortPositionEpsilon: Float  = 0.005   // 5mm world units — barely perceptible quality loss
+    private let sortDirectionEpsilon: Float = 0.0002  // ~0.01 degrees — rotation jitter more visible
     private var sortedIndexBuffer:  MTLBuffer?  // last sorted result buffer
+
+    // Triple-buffering semaphore: prevents CPU from overwriting GPU-active buffer slots.
+    // Without this, CPU can run 5–10 frames ahead on fast M1 Pro, causing matrix tearing.
+    private let maxFramesInFlight = 3
+    private let frameSemaphore = DispatchSemaphore(value: 3)
 
     private var modelMatrix: float4x4 {
         float4x4.translation(sceneTranslation)
@@ -259,6 +264,9 @@ class Renderer: NSObject, MTKViewDelegate {
               let drawable  = view.currentDrawable
         else { return }
 
+        // Block until a previous frame's GPU work completes — prevents buffer overwrites.
+        frameSemaphore.wait()
+
         frameCount += 1
         let count = UInt32(scene.splatCount)
 
@@ -281,8 +289,8 @@ class Renderer: NSObject, MTKViewDelegate {
         let isAnimating = animationSystem?.engine.isPlaying == true
         let needsSort   = isAnimating
                        || sortedIndexBuffer == nil
-                       || posDelta > sortEpsilon
-                       || dirDelta > sortEpsilon
+                       || posDelta > sortPositionEpsilon
+                       || dirDelta > sortDirectionEpsilon
 
         // ── Single command buffer for the entire frame ────────────────────────
         // Metal automatically synchronizes resources between encoders in the
@@ -410,6 +418,9 @@ class Renderer: NSObject, MTKViewDelegate {
         }
 
         cb.present(drawable)
+        cb.addCompletedHandler { [weak self] _ in
+            self?.frameSemaphore.signal()
+        }
         cb.commit()
     }
 
