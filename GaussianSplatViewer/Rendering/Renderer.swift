@@ -215,9 +215,16 @@ class Renderer: NSObject, MTKViewDelegate {
             print("Scale threshold auto-set: p99=\(p99), threshold=\(splatSettings.maxScaleThreshold)")
         }
 
+        // Release old Metal buffer references before reallocation so ARC can
+        // reclaim GPU memory immediately. Prevents stale-buffer crashes when
+        // the user loads a second PLY file in the same session.
+        sortedIndexBuffer = nil
+        sortIndexBufA     = nil
+        sortIndexBufB     = nil
+        splatVertexBuffer = nil
+        depthKeyBuffer    = nil
         allocatePerSceneBuffers(count: scene.splatCount)
         // Reset sort state so first frame always sorts
-        sortedIndexBuffer  = nil
         lastSortCamPos     = float3(repeating: .infinity)
         lastSortCamForward = float3(0, 0, -1)
     }
@@ -287,10 +294,12 @@ class Renderer: NSObject, MTKViewDelegate {
         let posDelta   = simd_length(camera.position - lastSortCamPos)
         let dirDelta   = 1.0 - simd_dot(camForward, lastSortCamForward)
         let isAnimating = animationSystem?.engine.isPlaying == true
-        let needsSort   = isAnimating
-                       || sortedIndexBuffer == nil
+        // isAnimating is checked LAST so the epsilon guards short-circuit first.
+        // When the camera is static during animation, the sort is skipped entirely.
+        let needsSort   = sortedIndexBuffer == nil
                        || posDelta > sortPositionEpsilon
                        || dirDelta > sortDirectionEpsilon
+                       || isAnimating
 
         // ── Single command buffer for the entire frame ────────────────────────
         // Metal automatically synchronizes resources between encoders in the

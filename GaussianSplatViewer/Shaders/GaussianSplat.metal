@@ -369,15 +369,36 @@ kernel void initSortIndices(
 kernel void radixCount(
     device const uint* keys      [[ buffer(0) ]],   // depth keys
     device const uint* indices   [[ buffer(1) ]],   // current index order
-    device       uint* histogram [[ buffer(2) ]],   // 256 buckets
+    device       uint* histogram [[ buffer(2) ]],   // 256 buckets (global)
     constant     uint& count     [[ buffer(3) ]],
     constant     uint& bitShift  [[ buffer(4) ]],
-    uint gid [[ thread_position_in_grid ]]
+    uint  gid  [[ thread_position_in_grid ]],
+    uint  lid  [[ thread_position_in_threadgroup ]]
 ) {
-    if (gid >= count) return;
-    uint key    = keys[indices[gid]];
-    uint digit  = (key >> bitShift) & 0xFFu;
-    atomic_fetch_add_explicit((device atomic_uint*)&histogram[digit], 1u, memory_order_relaxed);
+    // Each threadgroup has its own 256-bucket local histogram.
+    // No contention between threadgroups — only threadgroup-local atomics.
+    threadgroup uint localHist[256];
+
+    // All 256 buckets initialized by threads 0–255 in parallel.
+    if (lid < 256) localHist[lid] = 0;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    // Each thread counts its element into the LOCAL (threadgroup) histogram.
+    if (gid < count) {
+        uint key   = keys[indices[gid]];
+        uint digit = (key >> bitShift) & 0xFFu;
+        // threadgroup atomics: fast, no global memory contention
+        atomic_fetch_add_explicit((threadgroup atomic_uint*)&localHist[digit],
+                                   1u, memory_order_relaxed);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    // Merge local histogram → global. Only 256 global atomics per threadgroup
+    // instead of 512 (one per thread). ~2× fewer global atomic collisions.
+    if (lid < 256 && localHist[lid] > 0) {
+        atomic_fetch_add_explicit((device atomic_uint*)&histogram[lid],
+                                   localHist[lid], memory_order_relaxed);
+    }
 }
 
 // ---------------------------------------------------------------------------
