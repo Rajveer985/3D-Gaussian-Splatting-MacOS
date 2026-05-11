@@ -216,7 +216,7 @@ kernel void projectSplats(
         if (maxS > settings.maxScaleThreshold) { verts[gid].opacity = 0; return; }
         // Soft fade: splats approaching the threshold fade out smoothly.
         // This removes the hard edge artifact at the cull boundary.
-        float fadeStart = settings.maxScaleThreshold * 0.7f;
+        float fadeStart = settings.maxScaleThreshold * 0.85f;
         if (maxS > fadeStart) {
             float t = (maxS - fadeStart) / (settings.maxScaleThreshold - fadeStart);
             effOpacity *= (1.0f - t);
@@ -252,11 +252,11 @@ kernel void projectSplats(
     float3x3 M  = Mm * R * S;
     float3x3 Sg = M * transpose(M);
 
-    float3x3 J = float3x3(
+    float3x3 J = transpose(float3x3(
         float3( fx/tz,        0.0f,          0.0f),
         float3( 0.0f,        -fy/tz,         0.0f),
         float3(-fx*vpx/tz2,   fy*vpy/tz2,    0.0f)
-    );
+    ));
     float3x3 W = float3x3(cam.viewMatrix[0].xyz,
                           cam.viewMatrix[1].xyz,
                           cam.viewMatrix[2].xyz);
@@ -266,10 +266,9 @@ kernel void projectSplats(
     float3x3 cov = transpose(T) * Sg * T;
 
     // Low-pass filter: every Gaussian should cover at least ~1 pixel.
-    // 0.6 (raised from 0.3) ensures the soft Gaussian falloff has enough
-    // pixel-space to render smooth elliptical edges instead of hard squares.
-    cov[0][0] += 0.6f;
-    cov[1][1] += 0.6f;
+    // Standard 3DGS reference value (graphdeco-inria, SuperSplat, MetalSplatter).
+    cov[0][0] += 0.3f;
+    cov[1][1] += 0.3f;
 
     float det = cov[0][0]*cov[1][1] - cov[0][1]*cov[0][1];
     if (det < 1e-6f) { verts[gid].opacity = 0; return; }
@@ -290,8 +289,15 @@ kernel void projectSplats(
 
     float di = 1.0f / det;
 
-    float3 viewDir = normalize(wp - cam.camPos);
-    float3 color   = evalSH(g, viewDir, settings.shDegreeOverride);
+    // Transform view direction back into original SH training space.
+    // When modelMatrix ≠ identity (user rotated/scaled the scene), the SH
+    // bands were trained in the original coordinate space, so we must undo
+    // the model rotation before querying SH coefficients.
+    float3x3 Minv = transpose(float3x3(cam.modelMatrix[0].xyz,
+                                        cam.modelMatrix[1].xyz,
+                                        cam.modelMatrix[2].xyz));
+    float3 shDir = normalize(Minv * (wp - cam.camPos));
+    float3 color = evalSH(g, shDir, settings.shDegreeOverride);
     color = adjustSaturation(color, settings.saturation);
 
     // SH evaluation produces sRGB-space colors (matching the training pipeline).
@@ -333,8 +339,8 @@ kernel void projectSplats(
 
     // sqrt maps more bits to near-camera range
     uint depthBits = uint(sqrt(normDepth) * float(0x000FFFFFu)) << 12u;
-    // 12-bit splat index — deterministic tie-breaker
-    uint idBits    = gid & 0xFFFu;
+    // 12-bit splat index — XOR-fold upper bits for better tie-breaking on large scenes
+    uint idBits    = (gid ^ (gid >> 12)) & 0xFFFu;
     depthKeys[gid] = depthBits | idBits;
 }
 

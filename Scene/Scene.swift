@@ -113,6 +113,9 @@ class Scene {
     }
 
     /// Sort splats back-to-front for alpha blending and update the GPU buffer.
+    /// - Warning: This CPU sort is superseded by the GPU radix sort in Renderer.swift.
+    ///   Do NOT call this — it will overwrite the GPU buffer with CPU-sorted data.
+    @available(*, deprecated, message: "Use GPU radix sort in Renderer.swift instead")
     func sortSplats(cameraPosition: float3, forward: float3) {
         guard !splats.isEmpty, let splatBuffer else { return }
 

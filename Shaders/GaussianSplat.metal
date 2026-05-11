@@ -179,11 +179,11 @@ kernel void projectSplats(
     //                [  0,    0,      0        ]
     float tz  = vp.z;
     float tz2 = tz * tz;
-    float3x3 J = float3x3(
+    float3x3 J = transpose(float3x3(
         float3( fx/tz,      0.0f,  0.0f),
         float3( 0.0f,  -fy/tz,    0.0f),
         float3(-(fx*vp.x)/tz2,  (fy*vp.y)/tz2, 0.0f)
-    );
+    ));
 
     // Upper-left 3x3 of view matrix (rotation part only)
     float3x3 W = float3x3(cam.viewMatrix[0].xyz,
@@ -234,7 +234,11 @@ kernel void projectSplats(
     verts[gid].opacity    = g.opacity;
     verts[gid].radius     = maxR;
     verts[gid]._pad       = 0;
-    verts[gid].color      = float4(shColor(g, normalize(wp - cam.camPos)), 1);
+    // Transform view direction back into original SH training space
+    float3x3 Minv = transpose(float3x3(cam.modelMatrix[0].xyz,
+                                        cam.modelMatrix[1].xyz,
+                                        cam.modelMatrix[2].xyz));
+    verts[gid].color      = float4(shColor(g, normalize(Minv * (wp - cam.camPos))), 1);
     verts[gid].majorAxis  = majorAxis;
     verts[gid].minorAxis  = minorAxis;
 }

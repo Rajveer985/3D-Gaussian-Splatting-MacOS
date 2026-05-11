@@ -115,7 +115,7 @@ struct SplatSettings {
     var saturation:        Float = 1.0
     var nearClip:          Float = 0.01
     var farClip:           Float = 100.0   // tighter range = better depth precision
-    var minOpacityCutoff:  Float = 3.0 / 255.0  // raised from 1/255 — reduces low-opacity popping
+    var minOpacityCutoff:  Float = 1.0 / 255.0  // standard threshold, matches reference renderers
     var shDegreeOverride:  Int32 = -1
     var bgColorR:          Float = 0.1
     var bgColorG:          Float = 0.1
