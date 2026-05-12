@@ -15,6 +15,7 @@ class Renderer: NSObject, MTKViewDelegate {
 
     var projectPSO:      MTLComputePipelineState?
     var initIndexPSO:    MTLComputePipelineState?
+    var clearHistPSO:    MTLComputePipelineState? // NEW
     var radixCountPSO:   MTLComputePipelineState?
     var prefixSumPSO:    MTLComputePipelineState?
     var radixScatterPSO: MTLComputePipelineState?
@@ -56,6 +57,11 @@ class Renderer: NSObject, MTKViewDelegate {
     private let sortPositionEpsilon: Float  = 0.005   // 5mm world units — barely perceptible quality loss
     private let sortDirectionEpsilon: Float = 0.00001  // catches even 1-pixel rotation
     private var sortedIndexBuffer:  MTLBuffer?  // last sorted result buffer
+    
+    // Our lists for the CPU
+    private var cpuSortIndices: [UInt32] = []
+    private var packedSortArray: [UInt64] = [] 
+    private var packedSortArrayTemp: [UInt64] = [] // NEW: Scratch buffer for Radix Sort
 
     // Triple-buffering semaphore: prevents CPU from overwriting GPU-active buffer slots.
     // Without this, CPU can run 5–10 frames ahead on fast M1 Pro, causing matrix tearing.
@@ -133,6 +139,7 @@ class Renderer: NSObject, MTKViewDelegate {
 
         projectPSO      = makePSO("projectSplats")
         initIndexPSO    = makePSO("initSortIndices")
+        clearHistPSO    = makePSO("clearHistogram") // NEW
         radixCountPSO   = makePSO("radixCount")
         prefixSumPSO    = makePSO("prefixSum")
         radixScatterPSO = makePSO("radixScatter")
@@ -227,6 +234,10 @@ class Renderer: NSObject, MTKViewDelegate {
         // Reset sort state so first frame always sorts
         lastSortCamPos     = float3(repeating: .infinity)
         lastSortCamForward = float3(0, 0, -1)
+        
+        // Fill our lists with the exact right amount of empty space so we never lag
+        cpuSortIndices = Array(0..<UInt32(scene.splatCount))
+        packedSortArray = Array(repeating: 0, count: scene.splatCount)
     }
 
     private func allocatePerSceneBuffers(count: Int) {
@@ -244,6 +255,11 @@ class Renderer: NSObject, MTKViewDelegate {
             length: MemoryLayout<UInt32>.stride * count,
             options: .storageModeShared)
         print("Per-scene GPU buffers allocated for \(count) splats")
+        
+        // NEW: Make absolutely sure the CPU arrays are the exact same size as the GPU buffers!
+        cpuSortIndices = Array(0..<UInt32(count))
+        packedSortArray = Array(repeating: 0, count: count)
+        packedSortArrayTemp = Array(repeating: 0, count: count)
     }
 
     // MARK: - MTKViewDelegate
@@ -322,79 +338,81 @@ class Renderer: NSObject, MTKViewDelegate {
             enc.endEncoding()
         }
 
-        // ── Pass 2: Radix sort (4 passes, fully on GPU) ───────────────────────
+        // ── Pass 2: Stable Global Block-Scan GPU Sort ───────────────────────
         if needsSort {
             lastSortCamPos     = camera.position
             lastSortCamForward = camForward
+            
+            // NEW: Dynamically build the massive 2D spreadsheet memory
+            var n = count
+            let num_tg = (Int(count) + 255) / 256
+            let totalBins = num_tg * 256
+            if histogramBuffer == nil || histogramBuffer!.length < totalBins * 4 {
+                histogramBuffer = device.makeBuffer(length: totalBins * 4, options: .storageModePrivate)
+            }
+            guard let histBuf = histogramBuffer else { return }
 
-            // Init sort indices
-            if let pso = initIndexPSO, let enc = cb.makeComputeCommandEncoder() {
-                enc.setComputePipelineState(pso)
+            if let initPSO = initIndexPSO, let clearPSO = clearHistPSO,
+               let countPSO = radixCountPSO, let sumPSO = prefixSumPSO,
+               let scatterPSO = radixScatterPSO, let enc = cb.makeComputeCommandEncoder() {
+
+                // 1. Initialize our start positions
+                enc.setComputePipelineState(initPSO)
                 enc.setBuffer(bufA, offset: 0, index: 0)
-                var n = count
                 enc.setBytes(&n, length: 4, index: 1)
-                enc.dispatchThreads(
-                    MTLSize(width: Int(count), height: 1, depth: 1),
-                    threadsPerThreadgroup: MTLSize(width: computeThreadgroupWidth, height: 1, depth: 1))
-                enc.endEncoding()
-            }
+                enc.dispatchThreads(MTLSize(width: Int(count), height: 1, depth: 1),
+                                    threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
-            var pingIn  = bufA
-            var pingOut = bufB
+                var currentIn = bufA
+                var currentOut = bufB
 
-            // 4 passes × 8 bits = 32-bit sort, fully GPU, zero CPU stalls
-            for pass in 0..<4 {
-                let shift = UInt32(pass * 8)
+                // 2. 100% Deterministic Radix Sort
+                for pass in 0..<4 {
+                    var shift = UInt32(pass * 8)
 
-                // Clear histogram
-                if let blit = cb.makeBlitCommandEncoder() {
-                    blit.fill(buffer: histBuf, range: 0..<histBuf.length, value: 0)
-                    blit.endEncoding()
-                }
-
-                // Count
-                if let pso = radixCountPSO, let enc = cb.makeComputeCommandEncoder() {
-                    enc.setComputePipelineState(pso)
-                    enc.setBuffer(depthBuf, offset: 0, index: 0)
-                    enc.setBuffer(pingIn,   offset: 0, index: 1)
-                    enc.setBuffer(histBuf,  offset: 0, index: 2)
-                    var n = count; enc.setBytes(&n, length: 4, index: 3)
-                    var s = shift; enc.setBytes(&s, length: 4, index: 4)
-                    enc.dispatchThreads(
-                        MTLSize(width: Int(count), height: 1, depth: 1),
-                        threadsPerThreadgroup: MTLSize(width: computeThreadgroupWidth, height: 1, depth: 1))
-                    enc.endEncoding()
-                }
-
-                // GPU prefix sum — serial scan by 1 thread, foolproof correctness
-                if let pso = prefixSumPSO, let enc = cb.makeComputeCommandEncoder() {
-                    enc.setComputePipelineState(pso)
+                    // Step A: Wipe the spreadsheet
+                    enc.setComputePipelineState(clearPSO)
                     enc.setBuffer(histBuf, offset: 0, index: 0)
-                    // 1 thread — serial scan over 256 buckets
-                    enc.dispatchThreadgroups(
-                        MTLSize(width: 1, height: 1, depth: 1),
-                        threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
-                    enc.endEncoding()
-                }
+                    enc.setBytes(&n, length: 4, index: 1)
+                    enc.dispatchThreads(MTLSize(width: totalBins, height: 1, depth: 1),
+                                        threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
-                // Scatter
-                if let pso = radixScatterPSO, let enc = cb.makeComputeCommandEncoder() {
-                    enc.setComputePipelineState(pso)
+                    // Step B: Threadgroups write to their personal columns
+                    enc.setComputePipelineState(countPSO)
                     enc.setBuffer(depthBuf, offset: 0, index: 0)
-                    enc.setBuffer(pingIn,   offset: 0, index: 1)
-                    enc.setBuffer(pingOut,  offset: 0, index: 2)
-                    enc.setBuffer(histBuf,  offset: 0, index: 3)
-                    var n = count; enc.setBytes(&n, length: 4, index: 4)
-                    var s = shift; enc.setBytes(&s, length: 4, index: 5)
-                    enc.dispatchThreads(
-                        MTLSize(width: Int(count), height: 1, depth: 1),
-                        threadsPerThreadgroup: MTLSize(width: computeThreadgroupWidth, height: 1, depth: 1))
-                    enc.endEncoding()
-                }
+                    enc.setBuffer(currentIn, offset: 0, index: 1)
+                    enc.setBuffer(histBuf, offset: 0, index: 2)
+                    enc.setBytes(&n, length: 4, index: 3)
+                    enc.setBytes(&shift, length: 4, index: 4)
+                    enc.dispatchThreads(MTLSize(width: Int(count), height: 1, depth: 1),
+                                        threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
-                swap(&pingIn, &pingOut)
+                    // Step C: The Parallel Accountant
+                    enc.setComputePipelineState(sumPSO)
+                    enc.setBuffer(histBuf, offset: 0, index: 0)
+                    enc.setBytes(&n, length: 4, index: 1)
+                    // NEW: Dispatch 256 threads to scan all 256 buckets simultaneously!
+                    enc.dispatchThreads(MTLSize(width: 256, height: 1, depth: 1),
+                                        threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+
+                    // Step D: Scatter instantly and perfectly
+                    enc.setComputePipelineState(scatterPSO)
+                    enc.setBuffer(depthBuf, offset: 0, index: 0)
+                    enc.setBuffer(currentIn, offset: 0, index: 1)
+                    enc.setBuffer(currentOut, offset: 0, index: 2)
+                    enc.setBuffer(histBuf, offset: 0, index: 3)
+                    enc.setBytes(&n, length: 4, index: 4)
+                    enc.setBytes(&shift, length: 4, index: 5)
+                    enc.dispatchThreads(MTLSize(width: Int(count), height: 1, depth: 1),
+                                        threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+
+                    let temp = currentIn
+                    currentIn = currentOut
+                    currentOut = temp
+                }
+                enc.endEncoding()
+                sortedIndexBuffer = currentIn
             }
-            sortedIndexBuffer = pingIn
         }
 
         let sortedBuf = sortedIndexBuffer ?? bufA

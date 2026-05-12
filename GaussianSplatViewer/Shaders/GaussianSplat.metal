@@ -333,9 +333,8 @@ kernel void projectSplats(
 
     float normDepth = clamp(depth / max(settings.farClip, 1.0f), 0.0f, 1.0f);
 
-    // sqrt maps more bits to near-camera range
-    uint depthBits = uint(sqrt(normDepth) * float(0x000FFFFFu)) << 12u;
-    // 12-bit splat index — XOR-fold upper bits for better tie-breaking on large scenes
+    // We changed the number here by just 1 so it doesn't overflow!
+    uint depthBits = uint(normDepth * 1048575.0f) << 12u;
     uint idBits    = (gid ^ (gid >> 12)) & 0xFFFu;
     depthKeys[gid] = depthBits | idBits;
 }
@@ -363,83 +362,138 @@ kernel void initSortIndices(
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Kernel 3a: Radix sort — count pass
-// Count occurrences of each 8-bit digit value for the current radix pass
+// Kernel: Safely wipe the massive 2D histogram grid
+// ---------------------------------------------------------------------------
+kernel void clearHistogram(
+    device uint* histogram [[ buffer(0) ]],
+    constant uint& count   [[ buffer(1) ]],
+    uint gid [[ thread_position_in_grid ]]
+) {
+    uint num_tg = (count + 255) / 256;
+    uint total_bins = 256 * num_tg;
+    if (gid < total_bins) {
+        histogram[gid] = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Kernel 3a: Count — Every threadgroup gets its own row in the grid!
 // ---------------------------------------------------------------------------
 kernel void radixCount(
-    device const uint* keys      [[ buffer(0) ]],   // depth keys
-    device const uint* indices   [[ buffer(1) ]],   // current index order
-    device       uint* histogram [[ buffer(2) ]],   // 256 buckets (global)
+    device const uint* keys      [[ buffer(0) ]],
+    device const uint* indices   [[ buffer(1) ]],
+    device       uint* histogram [[ buffer(2) ]],
     constant     uint& count     [[ buffer(3) ]],
     constant     uint& bitShift  [[ buffer(4) ]],
     uint  gid  [[ thread_position_in_grid ]],
-    uint  lid  [[ thread_position_in_threadgroup ]]
+    uint  lid  [[ thread_position_in_threadgroup ]],
+    uint  tgid [[ threadgroup_position_in_grid ]]
 ) {
-    // Each threadgroup has its own 256-bucket local histogram.
-    // No contention between threadgroups — only threadgroup-local atomics.
     threadgroup uint localHist[256];
-
-    // All 256 buckets initialized by threads 0–255 in parallel.
     if (lid < 256) localHist[lid] = 0;
     threadgroup_barrier(mem_flags::mem_threadgroup);
 
-    // Each thread counts its element into the LOCAL (threadgroup) histogram.
     if (gid < count) {
         uint key   = keys[indices[gid]];
         uint digit = (key >> bitShift) & 0xFFu;
-        // threadgroup atomics: fast, no global memory contention
         atomic_fetch_add_explicit((threadgroup atomic_uint*)&localHist[digit],
                                    1u, memory_order_relaxed);
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
 
-    // Merge local histogram → global. Only 256 global atomics per threadgroup
-    // instead of 512 (one per thread). ~2× fewer global atomic collisions.
-    if (lid < 256 && localHist[lid] > 0) {
-        atomic_fetch_add_explicit((device atomic_uint*)&histogram[lid],
-                                   localHist[lid], memory_order_relaxed);
+    uint num_tg = (count + 255) / 256;
+    if (lid < 256) {
+        // Write perfectly into our dedicated column in the global 2D grid
+        histogram[lid * num_tg + tgid] = localHist[lid];
     }
 }
 
 // ---------------------------------------------------------------------------
-// Kernel 3b: GPU Exclusive Prefix Sum — simple serial scan by thread 0
-//
-// 256 buckets is trivially small. A single thread loops through all 256
-// entries and accumulates the exclusive prefix sum. This is mathematically
-// foolproof and takes < 0.01ms on any Apple GPU.
-// Back-to-front scan (255 → 0) produces back-to-front render order.
+// Kernel 3b: Parallel Global Scan — 256 threads calculate offsets simultaneously
 // ---------------------------------------------------------------------------
 kernel void prefixSum(
-    device uint* histogram [[ buffer(0) ]]
+    device uint* histogram [[ buffer(0) ]],
+    constant uint& count   [[ buffer(1) ]],
+    uint lid  [[ thread_position_in_threadgroup ]],
+    uint tgid [[ threadgroup_position_in_grid ]]
 ) {
-    // Only thread 0 does the work — serial, no sync issues possible
-    uint sum = 0;
-    for (int b = 255; b >= 0; b--) {
-        uint c = histogram[b];
-        histogram[b] = sum;
-        sum += c;
+    // Only allow one threadgroup of 256 threads to run this
+    if (tgid > 0) return; 
+    
+    uint num_tg = (count + 255) / 256;
+    uint digit = 255 - lid; // Descending order for back-to-front rendering
+    
+    // 1. Parallel Local Scan: Each thread scans its own bucket's row
+    uint my_total = 0;
+    for (uint tg = 0; tg < num_tg; tg++) {
+        uint idx = digit * num_tg + tg;
+        uint c = histogram[idx];
+        histogram[idx] = my_total;
+        my_total += c;
+    }
+    
+    // 2. Share totals using lightning-fast threadgroup memory
+    threadgroup uint totals[256];
+    totals[lid] = my_total;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    
+    // 3. Compute Global Offset for this digit
+    uint global_offset = 0;
+    for (uint i = 0; i < lid; i++) {
+        global_offset += totals[i];
+    }
+    
+    // 4. Apply Global Offset instantly
+    for (uint tg = 0; tg < num_tg; tg++) {
+        uint idx = digit * num_tg + tg;
+        histogram[idx] += global_offset;
     }
 }
 
 // ---------------------------------------------------------------------------
-// Kernel 3c: Radix sort — scatter pass
-// Scatter elements into output buffer using GPU prefix-sum offsets
+// Kernel 3c: Scatter — Drop splats instantly with ZERO atomics!
 // ---------------------------------------------------------------------------
 kernel void radixScatter(
     device const uint* keysIn    [[ buffer(0) ]],
     device const uint* indicesIn [[ buffer(1) ]],
     device       uint* indicesOut[[ buffer(2) ]],
-    device       uint* offsets   [[ buffer(3) ]],   // exclusive prefix sum of histogram
+    device const uint* histogram [[ buffer(3) ]],   
     constant     uint& count     [[ buffer(4) ]],
     constant     uint& bitShift  [[ buffer(5) ]],
-    uint gid [[ thread_position_in_grid ]]
+    uint gid  [[ thread_position_in_grid ]],
+    uint lid  [[ thread_position_in_threadgroup ]],
+    uint tgid [[ threadgroup_position_in_grid ]]
 ) {
-    if (gid >= count) return;
-    uint idx    = indicesIn[gid];
-    uint key    = keysIn[idx];
-    uint digit  = (key >> bitShift) & 0xFFu;
-    uint pos    = atomic_fetch_add_explicit((device atomic_uint*)&offsets[digit], 1u, memory_order_relaxed);
-    indicesOut[pos] = idx;
+    threadgroup uint shared_digits[256];
+    uint digit = 0;
+    if (gid < count) {
+        uint idx = indicesIn[gid];
+        digit = (keysIn[idx] >> bitShift) & 0xFFu;
+        shared_digits[lid] = digit;
+    } else {
+        shared_digits[lid] = 999; 
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    uint local_rank = 0;
+    if (gid < count) {
+        for (uint i = 0; i < lid; ++i) {
+            if (shared_digits[i] == digit) {
+                local_rank++;
+            }
+        }
+    }
+
+    uint num_tg = (count + 255) / 256;
+    
+    if (gid < count) {
+        // Read our exact pre-calculated spot from the global ledger
+        uint global_base = histogram[digit * num_tg + tgid];
+        uint pos = global_base + local_rank;
+        
+        // Write it safely! No one else is allowed to touch this spot.
+        indicesOut[pos] = indicesIn[gid];
+    }
 }
 
 // ---------------------------------------------------------------------------
