@@ -1,0 +1,16 @@
+{
+  "source": "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/UI/Timeline/PropertyTrackRow.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Set keyframe for %@ at current frame",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 32
+        }
+      }
+    ]
+  },
+  "version": 1
+}

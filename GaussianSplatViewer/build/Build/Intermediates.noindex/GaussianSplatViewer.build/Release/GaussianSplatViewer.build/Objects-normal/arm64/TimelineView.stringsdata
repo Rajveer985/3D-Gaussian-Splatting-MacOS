@@ -1,0 +1,88 @@
+{
+  "source": "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/UI/Timeline/TimelineView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%@  @  frame %lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 101
+        }
+      },
+      {
+        "comment": "",
+        "key": "Interp:",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 112
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 113
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete this keyframe",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "Linear",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 117
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ease In",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 118
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ease Out",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 119
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ease In/Out",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 120
+        }
+      },
+      {
+        "comment": "",
+        "key": "Bezier",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 121
+        }
+      },
+      {
+        "comment": "",
+        "key": "Constant",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 122
+        }
+      }
+    ]
+  },
+  "version": 1
+}

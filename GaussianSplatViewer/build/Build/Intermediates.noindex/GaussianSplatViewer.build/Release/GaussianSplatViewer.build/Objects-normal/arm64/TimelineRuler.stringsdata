@@ -1,0 +1,16 @@
+{
+  "source": "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/UI/Timeline/TimelineRuler.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 34
+        }
+      }
+    ]
+  },
+  "version": 1
+}

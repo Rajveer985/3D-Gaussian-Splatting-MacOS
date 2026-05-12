@@ -22,6 +22,7 @@ struct ContentView: View {
     // Scene culling & camera — the two key parameters for visual quality
     @State private var maxScaleThreshold: Double = 0.0   // 0 = auto (set at load time)
     @State private var cameraDistance: Double = 5.0
+    @State private var qualityMode: Int32 = 0            // NEW: Quality dropdown state
     // Timeline
     @State private var showTimeline = false
     @State private var animErrorMsg: String?
@@ -431,6 +432,25 @@ struct ContentView: View {
                 // --- Quality Section ---
                 sectionHeader("Quality", icon: "wand.and.stars")
                 
+                // NEW: Render Quality Dropdown
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Render Quality")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Picker("", selection: $qualityMode) {
+                        Text("Auto (Dynamic)").tag(Int32(0))
+                        Text("High Quality").tag(Int32(1))
+                        Text("Balanced").tag(Int32(2))
+                        Text("Low (Fastest)").tag(Int32(3))
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .onChange(of: qualityMode) { newValue in
+                        viewModel.renderer?.splatSettings.qualityMode = newValue
+                    }
+                }
+                .help("Dynamically scales rendering math to boost FPS.")
+                
                 sliderRow(
                     label: "Min Alpha Cutoff",
                     value: $minOpacityCutoff,
@@ -599,6 +619,7 @@ struct ContentView: View {
         bgColor = Color(red: 0.1, green: 0.1, blue: 0.1)
         covRegularization = -1.0
         covRegEnabled = false
+        qualityMode = 0 // NEW: Reset quality
         
         viewModel.renderer?.splatSettings = SplatSettings()
     }    

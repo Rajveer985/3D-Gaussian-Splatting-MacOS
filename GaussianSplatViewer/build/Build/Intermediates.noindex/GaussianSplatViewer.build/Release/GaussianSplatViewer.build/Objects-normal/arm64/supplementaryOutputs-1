@@ -1,0 +1,12 @@
+{
+  "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/GaussianSplatViewerApp.swift" : {
+    "abi-baseline-json" : "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/build/Build/Intermediates.noindex/GaussianSplatViewer.build/Release/GaussianSplatViewer.build/Objects-normal/arm64/GaussianSplatViewer.abi.json",
+    "const-values" : "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/build/Build/Intermediates.noindex/GaussianSplatViewer.build/Release/GaussianSplatViewer.build/Objects-normal/arm64/GaussianSplatViewer-primary.swiftconstvalues",
+    "dependencies" : "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/build/Build/Intermediates.noindex/GaussianSplatViewer.build/Release/GaussianSplatViewer.build/Objects-normal/arm64/GaussianSplatViewer-primary.d",
+    "diagnostics" : "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/build/Build/Intermediates.noindex/GaussianSplatViewer.build/Release/GaussianSplatViewer.build/Objects-normal/arm64/GaussianSplatViewer-primary.dia",
+    "objc-header" : "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/build/Build/Intermediates.noindex/GaussianSplatViewer.build/Release/GaussianSplatViewer.build/Objects-normal/arm64/GaussianSplatViewer-Swift.h",
+    "swiftdoc" : "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/build/Build/Intermediates.noindex/GaussianSplatViewer.build/Release/GaussianSplatViewer.build/Objects-normal/arm64/GaussianSplatViewer.swiftdoc",
+    "swiftmodule" : "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/build/Build/Intermediates.noindex/GaussianSplatViewer.build/Release/GaussianSplatViewer.build/Objects-normal/arm64/GaussianSplatViewer.swiftmodule",
+    "swiftsourceinfo" : "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/build/Build/Intermediates.noindex/GaussianSplatViewer.build/Release/GaussianSplatViewer.build/Objects-normal/arm64/GaussianSplatViewer.swiftsourceinfo"
+  }
+}

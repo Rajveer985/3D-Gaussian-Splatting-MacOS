@@ -122,6 +122,7 @@ struct SplatSettings {
     var bgColorB:          Float = 0.1
     var covRegularization: Float = -1.0    // -1 = use 0.3 (SuperSplat default anti-alias)
     var maxScaleThreshold: Float = 0.0     // 0 = disabled (auto-set per scene at load time)
+    var qualityMode:       Int32 = 0       // NEW: 0=Auto, 1=High, 2=Balanced, 3=Low
 }
 
 // MARK: - Quaternion extensions

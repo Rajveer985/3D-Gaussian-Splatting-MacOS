@@ -1,0 +1,320 @@
+{
+  "source": "/Users/rajveersahay/ALL Projects (Except NanoAgent)/3DGS/GaussianSplatViewer/UI/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Animation Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 178
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open PLY File...",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 34
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ splats",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading...",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 74
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unable to Display File",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 84
+        }
+      },
+      {
+        "comment": "",
+        "key": "Gaussian Splat Viewer",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 103
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open a .ply file to view 3D Gaussian Splatting scenes",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 107
+        }
+      },
+      {
+        "comment": "",
+        "key": "Left drag: Rotate",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 114
+        }
+      },
+      {
+        "comment": "",
+        "key": "Right drag: Pan",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 120
+        }
+      },
+      {
+        "comment": "",
+        "key": "Scroll: Zoom",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 126
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 179
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 198
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset scene transform",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 205
+        }
+      },
+      {
+        "comment": "",
+        "key": "Toggle splat properties panel",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 227
+        }
+      },
+      {
+        "comment": "",
+        "key": "Toggle splat properties panel",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 236
+        }
+      },
+      {
+        "comment": "",
+        "key": "Toggle animation timeline",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 248
+        }
+      },
+      {
+        "comment": "",
+        "key": "Toggle animation timeline",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 255
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save animation (.gsanim)",
+        "location": {
+          "startingColumn": 15,
+          "startingLine": 263
+        }
+      },
+      {
+        "comment": "",
+        "key": "Load animation (.gsanim)",
+        "location": {
+          "startingColumn": 15,
+          "startingLine": 270
+        }
+      },
+      {
+        "comment": "",
+        "key": "Properties",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 223
+        }
+      },
+      {
+        "comment": "",
+        "key": "Properties",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "Timeline",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 244
+        }
+      },
+      {
+        "comment": "",
+        "key": "Timeline",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 251
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save Anim",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 259
+        }
+      },
+      {
+        "comment": "",
+        "key": "Load Anim",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 266
+        }
+      },
+      {
+        "comment": "",
+        "key": "Override spherical harmonics degree. Auto uses per-splat degree.",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 461
+        }
+      },
+      {
+        "comment": "",
+        "key": "Override adaptive covariance regularization. Controls splat sharpness/blur.",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 493
+        }
+      },
+      {
+        "comment": "",
+        "key": "Splat Properties",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 315
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset All",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 321
+        }
+      },
+      {
+        "comment": "",
+        "key": "SH Degree",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 446
+        }
+      },
+      {
+        "comment": "",
+        "key": "SH Degree",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 449
+        }
+      },
+      {
+        "comment": "",
+        "key": "Auto",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 450
+        }
+      },
+      {
+        "comment": "",
+        "key": "0 (Flat)",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 451
+        }
+      },
+      {
+        "comment": "",
+        "key": "1 (Linear)",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 452
+        }
+      },
+      {
+        "comment": "",
+        "key": "2 (Quadratic)",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 453
+        }
+      },
+      {
+        "comment": "",
+        "key": "3 (Cubic)",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 454
+        }
+      },
+      {
+        "comment": "",
+        "key": "Custom Cov. Regularization",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 466
+        }
+      },
+      {
+        "comment": "",
+        "key": "Color",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 499
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 503
+        }
+      }
+    ]
+  },
+  "version": 1
+}

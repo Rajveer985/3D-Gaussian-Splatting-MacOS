@@ -54,6 +54,7 @@ struct SplatSettings {
     float bgColorB;
     float covRegularization;
     float maxScaleThreshold;
+    int   qualityMode;       // NEW: 0=Auto, 1=High, 2=Balanced, 3=Low
 };
 
 // ---------------------------------------------------------------------------
@@ -297,7 +298,26 @@ kernel void projectSplats(
                                         cam.modelMatrix[1].xyz,
                                         cam.modelMatrix[2].xyz));
     float3 shDir = normalize(Minv * (wp - cam.camPos));
-    float3 color = evalSH(g, shDir, settings.shDegreeOverride);
+    
+    // NEW: Quality Mode Logic (Skips heavy math for tiny/distant splats)
+    int dynamicSH = settings.shDegreeOverride;
+    if (dynamicSH < 0) {
+        if (settings.qualityMode == 0) { // 0: Auto
+            if (r < 2.0f) dynamicSH = 0;
+            else if (r < 6.0f) dynamicSH = 1;
+            else dynamicSH = g.shDegree;
+        } else if (settings.qualityMode == 1) { // 1: High
+            dynamicSH = g.shDegree;
+        } else if (settings.qualityMode == 2) { // 2: Balanced
+            if (r < 1.0f) { verts[gid].opacity = 0; return; }
+            dynamicSH = min(g.shDegree, 1u);
+        } else if (settings.qualityMode == 3) { // 3: Low (Fastest)
+            if (r < 2.5f) { verts[gid].opacity = 0; return; }
+            dynamicSH = 0;
+        }
+    }
+    
+    float3 color = evalSH(g, shDir, dynamicSH);
     color = adjustSaturation(color, settings.saturation);
 
     // SH evaluation produces sRGB-space colors (matching the training pipeline).
